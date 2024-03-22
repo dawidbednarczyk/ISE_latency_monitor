@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 import urllib3
 import re
 import csv
-
+import os
 
 # Replace with the actual credentials and hostname
 hostname = "64.103.47.94"
@@ -58,21 +58,26 @@ def extract_step_latency(input_string):
 
 def create_csv():
 
-    header = [str(i) for i in range(1, 201)]
+    file_exists = os.path.isfile('output.csv')
+    
+    if not file_exists:
 
-    header.insert(0,"ClientLatency")
-    header.insert(0,"TotalAuthenLatency")
-    header.insert(0,"Username")
-    
-    
-    # Write data to CSV
-    with open('output.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(header)  # Writing header (optional)
+        header = [str(i) for i in range(1, 201)]
+
+        header.insert(0,"ClientLatency")
+        header.insert(0,"TotalAuthenLatency")
+        header.insert(0,"Timestamp")
+        header.insert(0,"Username")
+        
+        
+        # Write data to CSV
+        with open('output.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(header)  # Writing header (optional)
 
        
 
-def write_to_csv(input_string,username):
+def write_to_csv(input_string,username,auth_acs_timestamp):
     # Parsing the input string
     data_parts = input_string.split(":!:")
     step_latency_values = data_parts[0].split(";")
@@ -101,6 +106,7 @@ def write_to_csv(input_string,username):
 
     row.insert(0,str(client_latency))
     row.insert(0,str(total_auth_latency))
+    row.insert(0,auth_acs_timestamp)
     row.insert(0,username)
     
     with open('output.csv', 'a', newline='') as csvfile:
@@ -121,8 +127,16 @@ if root is not None:
         
         # Second API call for each user
         user_root = make_request(user_url, (username, password))
+
         
         if user_root is not None:
+        
+
+            
+            auth_acs_timestamp = user_root.find('auth_acs_timestamp').text
+            
+            print(auth_acs_timestamp)
+        
             # Convert the entire user_root XML to a string and print
             entire_response_as_string = ElementTree.tostring(user_root, encoding='unicode')
             #print(f"Full XML response for {user_name}:\n{entire_response_as_string}")
@@ -131,15 +145,19 @@ if root is not None:
             #print(other_attr_string)
             step_latency = extract_step_latency(str(other_attr_string))
             
-            sessions_data[user_name] = step_latency
+            sessions_data[user_name] = {
+                'step_latency': step_latency,
+                'auth_acs_timestamp': auth_acs_timestamp
+            }
             
             
 
 create_csv()
 
-# Displaying part of the dictionary containing username and step latencies
-for user, latency in sessions_data.items():
-    print(f"Username: {user}, Step Latency: {latency}")
-    write_to_csv(step_latency,user)
 
-# Optionally, save the data or further process it as needed
+# Displaying part of the dictionary containing username and step latencies
+for user, data in sessions_data.items():
+    step_latency = data['step_latency']
+    auth_acs_timestamp = data['auth_acs_timestamp']
+    print(f"Username: {user}, Step Latency: {step_latency}, Auth ACS Timestamp: {auth_acs_timestamp}")
+    write_to_csv(step_latency, user, auth_acs_timestamp)
