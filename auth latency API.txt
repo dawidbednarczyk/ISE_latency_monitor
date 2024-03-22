@@ -1,0 +1,27 @@
+https://community.cisco.com/t5/security-knowledge-base/ise-monitoring-api-examples/ta-p/4800437
+
+
+admin
+C1sco12345
+
+
+
+https://64.103.47.94/admin/API/mnt/Session/AuthList/null/null
+
+
+https://64.103.47.94/admin/API/mnt/Session/AuthList/2024-03-22%2014:35:00/2024-03-22%2014:45:00
+https://64.103.47.94/admin/API/mnt/Session/UserName/test
+
+
+
+
+<activeList noOfActiveSession="1">
+<activeSession>
+<user_name>test</user_name>
+<calling_station_id>48:F1:7F:81:F4:84</calling_station_id>
+<nas_ip_address>198.19.11.10</nas_ip_address>
+<audit_session_id>0A0B13C60000000F669C3A66</audit_session_id>
+<server>ISE</server>
+<framed_ipv6_address/>
+</activeSession>
+</activeList>

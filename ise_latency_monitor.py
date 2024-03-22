@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from xml.etree import ElementTree
 import urllib3
 import re
+import csv
+
 
 # Replace with the actual credentials and hostname
 hostname = "64.103.47.94"
@@ -53,6 +55,62 @@ def extract_step_latency(input_string):
         return "No match found"
 
 
+
+def create_csv():
+
+    header = [str(i) for i in range(1, 201)]
+
+    header.insert(0,"ClientLatency")
+    header.insert(0,"TotalAuthenLatency")
+    header.insert(0,"Username")
+    
+    
+    # Write data to CSV
+    with open('output.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(header)  # Writing header (optional)
+
+       
+
+def write_to_csv(input_string,username):
+    # Parsing the input string
+    data_parts = input_string.split(":!:")
+    step_latency_values = data_parts[0].split(";")
+    total_auth_latency = data_parts[1].split("=")[1]
+    client_latency = data_parts[2].split("=")[1]
+
+    # Create a dictionary for all possible columns, initializing with a default value (e.g., 0 or '')
+    data_dict = {str(i): '' for i in range(1, 201)}  # 200 columns + 1 for indexing from 1
+
+    # Update the dictionary with actual values from the input string
+    for item in step_latency_values:
+        key, value = item.split("=")
+        data_dict[key] = value
+
+    # Adding TotalAuthenLatency and ClientLatency to the end of the dictionary
+    data_dict['TotalAuthenLatency'] = total_auth_latency
+    data_dict['ClientLatency'] = client_latency
+
+    # Prepare data for CSV writing
+    header = [str(i) for i in range(1, 201)]
+
+   
+    row = [data_dict[str(i)] for i in header]
+
+
+
+    row.insert(0,str(client_latency))
+    row.insert(0,str(total_auth_latency))
+    row.insert(0,username)
+    
+    with open('output.csv', 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(row)  # Writing header (optional)
+    
+
+
+    print("Data written to CSV successfully.")
+
 # First API call to get the active sessions
 root = make_request(url, (username, password))
 if root is not None:
@@ -70,13 +128,18 @@ if root is not None:
             #print(f"Full XML response for {user_name}:\n{entire_response_as_string}")
 
             other_attr_string = user_root.find('other_attr_string').text if user_root.find('other_attr_string') is not None else 'No data'
-            
-            step_latency = extract_step_latency(other_attr_string)
+            #print(other_attr_string)
+            step_latency = extract_step_latency(str(other_attr_string))
             
             sessions_data[user_name] = step_latency
+            
+            
+
+create_csv()
 
 # Displaying part of the dictionary containing username and step latencies
 for user, latency in sessions_data.items():
     print(f"Username: {user}, Step Latency: {latency}")
+    write_to_csv(step_latency,user)
 
 # Optionally, save the data or further process it as needed
