@@ -38,6 +38,7 @@ sessions_data = {}
 # Function to make API requests
 def make_request(url, auth):
     response = requests.get(url, auth=auth, verify=False)
+    print(url)
     if response.status_code == 200:
         return ElementTree.fromstring(response.content)
     else:
@@ -64,6 +65,7 @@ def create_csv():
 
         header = [str(i) for i in range(1, 201)]
 
+        header.insert(0,"ResponseTime")
         header.insert(0,"ClientLatency")
         header.insert(0,"TotalAuthenLatency")
         header.insert(0,"Timestamp")
@@ -75,9 +77,29 @@ def create_csv():
             writer = csv.writer(csvfile)
             writer.writerow(header)  # Writing header (optional)
 
-       
+def write_steps_to_csv(steps,username,auth_acs_timestamp):
+    steps = str(steps)
+    
+    row = []
 
-def write_to_csv(input_string,username,auth_acs_timestamp):
+    row = steps.split(',')
+
+    row.insert(0,str(""))
+    row.insert(0,str(""))
+    row.insert(0,str(""))
+    row.insert(0,auth_acs_timestamp)
+    row.insert(0,username)
+
+
+    with open('output.csv', 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(row)  # Writing header (optional)
+    
+
+
+    print("Data written to CSV successfully.")
+
+def write_step_latency_to_csv(input_string,username,auth_acs_timestamp):
     # Parsing the input string
     data_parts = input_string.split(":!:")
     step_latency_values = data_parts[0].split(";")
@@ -95,15 +117,18 @@ def write_to_csv(input_string,username,auth_acs_timestamp):
     # Adding TotalAuthenLatency and ClientLatency to the end of the dictionary
     data_dict['TotalAuthenLatency'] = total_auth_latency
     data_dict['ClientLatency'] = client_latency
+    total_auth_latency = re.sub(r'[^a-zA-Z0-9\s]', '', total_auth_latency)
+    client_latency = re.sub(r'[^a-zA-Z0-9\s]', '', client_latency)
+    
+    response_time = 0
+    #response_time = int(total_auth_latency) - int(client_latency);
+    
 
     # Prepare data for CSV writing
     header = [str(i) for i in range(1, 201)]
-
-   
     row = [data_dict[str(i)] for i in header]
 
-
-
+    row.insert(0,str(response_time))
     row.insert(0,str(client_latency))
     row.insert(0,str(total_auth_latency))
     row.insert(0,auth_acs_timestamp)
@@ -135,18 +160,30 @@ if root is not None:
             
             auth_acs_timestamp = user_root.find('auth_acs_timestamp').text
             
-            print(auth_acs_timestamp)
+            #print(auth_acs_timestamp)
         
             # Convert the entire user_root XML to a string and print
             entire_response_as_string = ElementTree.tostring(user_root, encoding='unicode')
             #print(f"Full XML response for {user_name}:\n{entire_response_as_string}")
 
+            #todo - exctract step latencies and all the variables here, not in writing functions
+            #todo - exctract step latencies and all the variables here, not in writing functions
+            #todo - exctract step latencies and all the variables here, not in writing functions
+            #todo - exctract step latencies and all the variables here, not in writing functions
+
+
+
+
             other_attr_string = user_root.find('other_attr_string').text if user_root.find('other_attr_string') is not None else 'No data'
-            #print(other_attr_string)
+            execution_steps = user_root.find('execution_steps').text if user_root.find('execution_steps') is not None else 'No data'
+            #print("separator")
+            #print(execution_steps)
+            #print("separator")
             step_latency = extract_step_latency(str(other_attr_string))
-            
+            steps = execution_steps
             sessions_data[user_name] = {
                 'step_latency': step_latency,
+                'steps': steps,
                 'auth_acs_timestamp': auth_acs_timestamp
             }
             
@@ -158,6 +195,8 @@ create_csv()
 # Displaying part of the dictionary containing username and step latencies
 for user, data in sessions_data.items():
     step_latency = data['step_latency']
+    steps = data['steps']
     auth_acs_timestamp = data['auth_acs_timestamp']
-    print(f"Username: {user}, Step Latency: {step_latency}, Auth ACS Timestamp: {auth_acs_timestamp}")
-    write_to_csv(step_latency, user, auth_acs_timestamp)
+    print(f"Username: {user}, Step Latency: {step_latency}, Steps: {steps}, Auth ACS Timestamp: {auth_acs_timestamp}")
+    write_step_latency_to_csv(step_latency, user, auth_acs_timestamp)
+    write_steps_to_csv(steps, user, auth_acs_timestamp)
