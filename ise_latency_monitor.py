@@ -5,6 +5,7 @@ import urllib3
 import re
 import csv
 import os
+import json
 
 # Replace with the actual credentials and hostname
 hostname = "64.103.47.94"
@@ -55,92 +56,104 @@ def extract_step_latency(input_string):
     else:
         return "No match found"
 
-
-
 def create_csv():
 
     file_exists = os.path.isfile('output.csv')
     
     if not file_exists:
 
-        header = [str(i) for i in range(1, 201)]
-
+        header = []
+        
+        header.insert(0,"StepTime")
+        header.insert(0,"StepName")
+        header.insert(0,"StepID")
         header.insert(0,"ResponseTime")
         header.insert(0,"ClientLatency")
         header.insert(0,"TotalAuthenLatency")
         header.insert(0,"Timestamp")
         header.insert(0,"Username")
         
-        
         # Write data to CSV
         with open('output.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(header)  # Writing header (optional)
 
-def write_steps_to_csv(steps,username,auth_acs_timestamp):
-    steps = str(steps)
+def write_line_to_csv(user_name, auth_acs_timestamp, execution_steps, StepLatency, TotalAuthenLatency, ClientLatency, ResponseTime, StepNames):
+    # Combine elements from the three lists: execution_steps, StepLatency, and StepNames
+
+    StepLatency.insert(0,0)
+
+    row = [val for trio in zip(execution_steps, StepNames, StepLatency) for val in trio]
     
-    row = []
+    # Assuming the rest of the function writes this 'row' to a CSV file
+    # The 'row' now includes data from execution_steps, StepLatency, and StepNames in that sequential order for each step
 
-    row = steps.split(',')
-
-    row.insert(0,str(""))
-    row.insert(0,str(""))
-    row.insert(0,str(""))
+    row.insert(0,str(ResponseTime))
+    row.insert(0,str(ClientLatency))
+    row.insert(0,str(TotalAuthenLatency))
     row.insert(0,auth_acs_timestamp)
-    row.insert(0,username)
-
-
-    with open('output.csv', 'a', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(row)  # Writing header (optional)
-    
-
-
-    print("Data written to CSV successfully.")
-
-def write_step_latency_to_csv(input_string,username,auth_acs_timestamp):
-    # Parsing the input string
-    data_parts = input_string.split(":!:")
-    step_latency_values = data_parts[0].split(";")
-    total_auth_latency = data_parts[1].split("=")[1]
-    client_latency = data_parts[2].split("=")[1]
-
-    # Create a dictionary for all possible columns, initializing with a default value (e.g., 0 or '')
-    data_dict = {str(i): '' for i in range(1, 201)}  # 200 columns + 1 for indexing from 1
-
-    # Update the dictionary with actual values from the input string
-    for item in step_latency_values:
-        key, value = item.split("=")
-        data_dict[key] = value
-
-    # Adding TotalAuthenLatency and ClientLatency to the end of the dictionary
-    data_dict['TotalAuthenLatency'] = total_auth_latency
-    data_dict['ClientLatency'] = client_latency
-    total_auth_latency = re.sub(r'[^a-zA-Z0-9\s]', '', total_auth_latency)
-    client_latency = re.sub(r'[^a-zA-Z0-9\s]', '', client_latency)
-    
-    response_time = 0
-    #response_time = int(total_auth_latency) - int(client_latency);
-    
-
-    # Prepare data for CSV writing
-    header = [str(i) for i in range(1, 201)]
-    row = [data_dict[str(i)] for i in header]
-
-    row.insert(0,str(response_time))
-    row.insert(0,str(client_latency))
-    row.insert(0,str(total_auth_latency))
-    row.insert(0,auth_acs_timestamp)
-    row.insert(0,username)
+    row.insert(0,user_name)
     
     with open('output.csv', 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(row)  # Writing header (optional)
-    
 
 
-    print("Data written to CSV successfully.")
+def string_to_array(input_string):
+    # Split the string into a list based on commas
+    string_list = input_string.split(',')
+    # Convert each item in the list to an integer
+    integer_array = [int(item) for item in string_list]
+    return integer_array
+
+def string_to_dict(input_string):
+    # Split the string into components based on the custom separator ":!:"
+    components = input_string.split(":!:")
+
+    # Initialize an empty dictionary to hold the parsed data
+    parsed_dict = {}
+
+    # Iterate over each component
+    for component in components:
+        if "=" in component:
+            # Split each component into key and value based on the first "=" encountered
+            key, value = component.split("=", 1)
+            # Remove potential leading or trailing whitespaces from key and value
+            key = key.strip()
+            value = value.strip()
+            # Assign the key-value pair to the dictionary
+            # If a key already exists, append the value to the existing entry (as list if necessary)
+            if key in parsed_dict:
+                if isinstance(parsed_dict[key], list):
+                    parsed_dict[key].append(value)
+                else:
+                    parsed_dict[key] = [parsed_dict[key], value]
+            else:
+                parsed_dict[key] = value
+
+    return parsed_dict
+
+def extract_values_to_array(input_string):
+    # Split the string into components based on ";"
+    components = input_string.split(';')
+    # Initialize an empty list to hold the values
+    values = []
+    # Iterate over each component
+    for component in components:
+        if "=" in component:
+            # Split each component into key and value based on "="
+            _, value = component.split("=")
+            # Append the value to the list as an integer
+            values.append(int(value))
+    return values
+
+
+create_csv()
+
+
+with open('syslog_codes_to_descriptions.json', 'r') as file:
+    # Parse the JSON file and convert it into a Python dictionary
+    message_dictionary = json.load(file)
 
 # First API call to get the active sessions
 root = make_request(url, (username, password))
@@ -155,48 +168,31 @@ if root is not None:
 
         
         if user_root is not None:
-        
-
-            
             auth_acs_timestamp = user_root.find('auth_acs_timestamp').text
-            
-            #print(auth_acs_timestamp)
-        
+            execution_steps = string_to_array(user_root.find('execution_steps').text)
+            other_attr_string = user_root.find('other_attr_string').text if user_root.find('other_attr_string') is not None else 'No data'
+            other_attr_dict = string_to_dict(other_attr_string)
+            TotalAuthenLatency = int(other_attr_dict['TotalAuthenLatency'])
+            ClientLatency = int(other_attr_dict['ClientLatency'])
+            ResponseTime = TotalAuthenLatency - ClientLatency
+            StepLatency = extract_values_to_array(other_attr_dict['StepLatency'])
+            StepNames = [message_dictionary.get(str(item), "Not found") for item in execution_steps]
+            #print(other_attr_dict)
+
+            print(user_name)
+            print(auth_acs_timestamp)
+            print(TotalAuthenLatency)
+            print(ClientLatency)
+            print(ResponseTime)
+            #print(execution_steps)
+            #print(StepLatency)
+            #print(StepNames)
+
             # Convert the entire user_root XML to a string and print
-            entire_response_as_string = ElementTree.tostring(user_root, encoding='unicode')
+            #entire_response_as_string = ElementTree.tostring(user_root, encoding='unicode')
             #print(f"Full XML response for {user_name}:\n{entire_response_as_string}")
 
-            #todo - exctract step latencies and all the variables here, not in writing functions
-            #todo - exctract step latencies and all the variables here, not in writing functions
-            #todo - exctract step latencies and all the variables here, not in writing functions
-            #todo - exctract step latencies and all the variables here, not in writing functions
 
-
-
-
-            other_attr_string = user_root.find('other_attr_string').text if user_root.find('other_attr_string') is not None else 'No data'
-            execution_steps = user_root.find('execution_steps').text if user_root.find('execution_steps') is not None else 'No data'
-            #print("separator")
-            #print(execution_steps)
-            #print("separator")
-            step_latency = extract_step_latency(str(other_attr_string))
-            steps = execution_steps
-            sessions_data[user_name] = {
-                'step_latency': step_latency,
-                'steps': steps,
-                'auth_acs_timestamp': auth_acs_timestamp
-            }
-            
+            write_line_to_csv(user_name,auth_acs_timestamp,execution_steps,StepLatency,TotalAuthenLatency,ClientLatency,ResponseTime,StepNames)
             
 
-create_csv()
-
-
-# Displaying part of the dictionary containing username and step latencies
-for user, data in sessions_data.items():
-    step_latency = data['step_latency']
-    steps = data['steps']
-    auth_acs_timestamp = data['auth_acs_timestamp']
-    print(f"Username: {user}, Step Latency: {step_latency}, Steps: {steps}, Auth ACS Timestamp: {auth_acs_timestamp}")
-    write_step_latency_to_csv(step_latency, user, auth_acs_timestamp)
-    write_steps_to_csv(steps, user, auth_acs_timestamp)
