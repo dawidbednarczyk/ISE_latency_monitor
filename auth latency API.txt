@@ -1,11 +1,6 @@
 https://community.cisco.com/t5/security-knowledge-base/ise-monitoring-api-examples/ta-p/4800437
 
 
-admin
-C1sco12345
-
-
-
 https://64.103.47.94/admin/API/mnt/Session/AuthList/null/null
 
 
